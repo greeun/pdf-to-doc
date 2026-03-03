@@ -1,6 +1,6 @@
 ---
 name: pdf-to-doc
-description: Analyze PDF content following document flow, extract structured data (title → subtitle → content), and output as markdown or JSON. Use when user says "PDF 읽어줘", "PDF 내용 추출", "md로 만들어줘", or requests PDF analysis.
+description: Analyze PDF content following document flow, extract structured data (title → subtitle → content), and output as markdown or JSON. Supports OCR for scanned/image-based PDFs. Use when user says "PDF 읽어줘", "PDF 내용 추출", "md로 만들어줘", "스캔 PDF OCR", "이미지 PDF 텍스트 추출", or requests PDF analysis.
 ---
 
 # pdf-to-doc
@@ -11,9 +11,11 @@ PDF 파일을 pdfplumber로 추출한 후 문서 흐름에 맞게 구조화하�
 ## Quick Start
 
 ```
-"report.pdf 내용 추출해서 md로 만들어줘"
-"paper.pdf 요약해줘"
-"contract.pdf 그대로 추출해줘"
+"report.pdf 내용 추출해서 md로 만들어줘"   → Extract 모드
+"paper.pdf 요약해줘"                       → Analyze 모드
+"contract.pdf 그대로 추출해줘"             → Extract 모드
+"스캔된 PDF인데 텍스트 추출해줘"            → OCR 모드 (--ocr)
+"이미지 기반 PDF라 텍스트가 없어"           → OCR 모드 (--ocr)
 ```
 
 ## Workflow
