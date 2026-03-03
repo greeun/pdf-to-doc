@@ -7,6 +7,8 @@
 - **Extract 모드**: 원문 그대로 추출, 계층 구조만 정리
 - **Analyze 모드**: 섹션별 요약 + 핵심 포인트 bullet
 
+스캔된 PDF(이미지 기반)는 OCR을 통해 텍스트를 인식합니다.
+
 ---
 
 ## Installation
@@ -14,14 +16,20 @@
 ### 1. 스킬 설치
 
 ```bash
-# Claude Code skills 디렉토리에 배치
 cp -r pdf-to-doc/ ~/.claude/skills/
 ```
 
 ### 2. 의존성 설치
 
+**기본 (텍스트 PDF):**
 ```bash
 pip install pdfplumber
+```
+
+**OCR 포함 (스캔 PDF):**
+```bash
+brew install tesseract tesseract-lang ocrmypdf
+pip install pymupdf pytesseract
 ```
 
 ---
@@ -84,15 +92,30 @@ Total revenue for fiscal year 2024 was $10.2 billion...
 - AI 진단 정확도가 인간 의사 대비 평균 15% 향상
 - 비용 절감 효과: 연간 $150B 예상
 - 주요 적용 분야: 영상의학, 신약 개발, 환자 모니터링
+```
 
-## Methodology
+---
 
-**요약**: 2019-2024년 50개 병원 데이터를 분석한 메타 연구.
+## OCR Mode (스캔 PDF)
 
-**핵심 포인트:**
-- 무작위 대조 임상시험(RCT) 방법론 사용
-- 15만 명 환자 데이터 분석
-- 3개 AI 모델 비교: GPT-4, Med-PaLM 2, BioGPT
+텍스트 레이어가 없는 스캔 PDF에 OCR을 적용합니다.
+
+**트리거 예시:**
+```
+"스캔된 PDF인데 텍스트 추출해줘"
+"이미지 기반 PDF라 텍스트가 없어"
+"scan.pdf OCR 적용해서 md로 만들어줘"
+```
+
+**동작 방식:**
+1. `ocrmypdf`로 PDF 전체에 텍스트 레이어 추가
+2. 텍스트가 없는 개별 페이지는 `pymupdf + pytesseract`로 이미지 OCR
+
+**언어 지정:**
+```
+"한국어 PDF야, OCR 해줘"           → --lang kor
+"영문 스캔 문서 추출해줘"            → --lang eng
+"한영 혼합 문서"                    → --lang kor+eng (기본값)
 ```
 
 ---
@@ -110,19 +133,15 @@ JSON 형식으로 출력을 요청할 수 있습니다.
 **출력 구조 (`document.json`):**
 ```json
 {
-  "title": "Document Title",
-  "sections": [
+  "pages": [
     {
-      "heading": "Section 1",
-      "content": "Section content...",
-      "subsections": [
-        {
-          "heading": "Subsection 1.1",
-          "content": "Subsection content..."
-        }
-      ]
+      "page": 1,
+      "text": "...",
+      "tables": [...]
     }
-  ]
+  ],
+  "total_pages": 10,
+  "ocr_applied": false
 }
 ```
 
@@ -130,13 +149,13 @@ JSON 형식으로 출력을 요청할 수 있습니다.
 
 ## Supported PDF Types
 
-| PDF 유형 | Extract | Analyze | 비고 |
-|---------|---------|---------|------|
-| 텍스트 기반 PDF | ✅ | ✅ | 최적 |
-| 스캔 PDF (이미지) | ❌ | ❌ | OCR 필요 |
-| 표 포함 PDF | ✅ | ✅ | 표 → Markdown 표 변환 |
-| 다국어 PDF | ✅ | ✅ | UTF-8 지원 |
-| 암호화 PDF | ❌ | ❌ | 비밀번호 해제 후 사용 |
+| PDF 유형 | Extract | Analyze | OCR | 비고 |
+|---------|---------|---------|-----|------|
+| 텍스트 기반 PDF | ✅ | ✅ | 불필요 | 최적 |
+| 스캔 PDF (이미지) | ✅ | ✅ | 필요 (`--ocr`) | tesseract 설치 필요 |
+| 표 포함 PDF | ✅ | ✅ | - | 표 → Markdown 표 변환 |
+| 다국어 PDF | ✅ | ✅ | - | UTF-8 지원 |
+| 암호화 PDF | ❌ | ❌ | - | 비밀번호 해제 후 사용 |
 
 ---
 
@@ -145,11 +164,11 @@ JSON 형식으로 출력을 요청할 수 있습니다.
 ```
 PDF 파일
     ↓
-extract_pdf.py (pdfplumber)
-    ├── 페이지별 텍스트 추출
-    └── 표(table) 감지 및 추출
+[텍스트 PDF]                      [스캔 PDF (--ocr)]
+pdfplumber 텍스트 추출              ocrmypdf → 텍스트 레이어 추가
+                                   텍스트 없는 페이지 → pytesseract OCR
     ↓
-JSON 출력: { pages: [{page, text, tables}] }
+정제: 반복 헤더/푸터 제거, 페이지 번호 제거
     ↓
 Claude 처리
     ├── Extract 모드: 계층 구조 감지 → Markdown 헤딩 변환
@@ -162,19 +181,20 @@ Claude 처리
 
 ## Troubleshooting
 
-### `pdfplumber not installed` 오류
+### `pdfplumber not installed`
 ```bash
 pip install pdfplumber
 ```
 
-### 텍스트가 제대로 추출되지 않는 경우
-스캔된 PDF(이미지 기반)일 가능성이 높습니다. OCR 도구(예: `pytesseract`, `ocrmypdf`)로 사전 처리 후 사용하세요.
-
+### `tesseract not found` (OCR 사용 시)
 ```bash
-# ocrmypdf로 사전 처리
-pip install ocrmypdf
-ocrmypdf input.pdf input_ocr.pdf
+brew install tesseract tesseract-lang
 ```
 
+### 한국어 OCR 인식률이 낮은 경우
+해상도가 낮은 스캔본일 수 있습니다. 스캔 DPI를 300 이상으로 높여 재스캔하세요.
+스크립트는 내부적으로 2배 해상도(Matrix 2x2)로 렌더링하여 정확도를 높입니다.
+
 ### 표가 깨지는 경우
-복잡한 중첩 표는 pdfplumber가 완벽히 처리하지 못할 수 있습니다. Extract 모드에서 수동으로 정리하는 것을 권장합니다.
+복잡한 중첩 표는 pdfplumber가 완벽히 처리하지 못할 수 있습니다.
+Extract 모드에서 수동으로 정리하는 것을 권장합니다.
