@@ -1,6 +1,7 @@
 ---
 name: pdf-to-doc
 description: Analyze PDF content following document flow, extract structured data (title → subtitle → content), and output as markdown or JSON. Supports OCR for scanned/image-based PDFs. Use when user says "PDF 읽어줘", "PDF 내용 추출", "md로 만들어줘", "스캔 PDF OCR", "이미지 PDF 텍스트 추출", or requests PDF analysis.
+version: 1.0.0
 ---
 
 # pdf-to-doc
